@@ -22,28 +22,57 @@ class ExperimentApp:
         
         self.name = StringVar()
         self.gender = StringVar()
-        self.age = IntVar()
+        self.age = StringVar()
 
         self.user_data = []
         self.responses = []
 
-        self.video_folder_path = "C:/Users/kevin/Documents/MS_S23/CS7633_HRI/7633_Legibility_Proj/test_videos"
-        self.video_files = []
-        self.load_video_files()
+        self.video_folder_path = os.getcwd() + "/videos"
+        self.video_files, self.practice_video = self.load_video_files()
         self.spacebar_press_times = []
         self.reaction_times = []
         self.current_video = None
         self.start_time = None
         self.results = []
+        self.practice_mode = True
 
         # Start the experiment
         self.main_page()
         self.window.mainloop()
 
     def load_video_files(self):
-        for filename in os.listdir(self.video_folder_path):
-            if filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv')):
-                self.video_files.append(os.path.join(self.video_folder_path, filename))
+        # Define the folder names and subfolder names
+        folder_names = ["bc", "hbc", "iris_MSE"]
+        subfolder_names = ["green", "red"]
+
+        # Practice video
+        practice_video = os.path.join(self.video_folder_path, "practice_video.mp4")
+
+        # Define a dictionary to store the video paths
+        video_paths = {
+            "bc_green": [],
+            "bc_red": [],
+            "hbc_green": [],
+            "hbc_red": [],
+            "iris_MSE_green": [],
+            "iris_MSE_red": []
+        }
+
+        # Loop through the folder names and subfolder names to find the video files
+        for folder_name in folder_names:
+            for subfolder_name in subfolder_names:
+                path = os.path.join(self.video_folder_path, folder_name, subfolder_name)
+                video_files = os.listdir(path)
+                if video_files:
+                    # Randomly select two video files from the subfolder
+                    selected_videos = random.sample(video_files, 2)
+                    # Add the selected video paths to the corresponding dictionary key
+                    video_paths[f"{folder_name}_{subfolder_name}"] = [os.path.join(path, video_file) for video_file in selected_videos]
+
+        # Combine the video paths into a single list and return it
+        comb_list = [video_path for video_paths_list in video_paths.values() for video_path in video_paths_list]
+        
+        return comb_list[::2], practice_video
 
     def main_page(self):
         # Create the main landing page interface
@@ -81,20 +110,17 @@ class ExperimentApp:
             widget.grid_forget()
 
         # Create the instructions text
-        instructions_text = Text(self.window, wrap="word", height=10, width=50, padx=10, pady=10, bg="white")
-        instructions_text.insert("1.0", "Please read the following instructions carefully...\n\n"
-                                      "1. When you click 'Start', a video will play automatically.\n"
-                                      "2. As soon as the video starts, press the spacebar when you see something "
-                                      "interesting.\n"
-                                      "3. You will then see two buttons, 'Green' and 'Red'.\n"
-                                      "4. Choose one of the buttons based on your decision.\n"
-                                      "5. The process will repeat with a new video 8 times.\n\n"
-                                      "Click 'Start' to begin the experiment.")
+        instructions_text = Text(self.window, wrap="word", height=20, width=50, padx=10, pady=10, bg="white")
+        instructions_text.insert("1.0", "1. When you click 'Start', a video will start playing automatically\n"
+                                      "2. A robotic arm will head towards either a RED or GREEN block. As soon are you are confident in which block the robot arm is going for, press the SPACEBAR\n"
+                                      "3. You will then see two buttons, 'Red' and 'Green'. Choose one of the buttons based on your decision.\n"
+                                      "4. The process will repeat with a new video for a total of 6 videos.\n\n"
+                                      "Click 'Practice' to go through a practice video before beginning the experiment videos.")
         instructions_text.config(state="disabled")  # Make the text read-only
         instructions_text.grid(row=0, column=0, padx=20, pady=20)
 
         # Create and place the "Start" button
-        start_button = Button(self.window, text="Start", command=self.experiment_page)
+        start_button = Button(self.window, text="Practice", command=self.experiment_page)
         start_button.grid(row=1, column=0, pady=20)
 
     def experiment_page(self):
@@ -115,7 +141,10 @@ class ExperimentApp:
         self.overlay.focus_force()
         self.overlay.lift()  # Bring the overlay window to the top level
 
-        self.play_video()
+        if self.practice_mode:
+            self.play_practice_video()
+        else:
+            self.play_video()
 
         # Find the current position of the mouse
         current_x, current_y = pyautogui.position()
@@ -126,6 +155,29 @@ class ExperimentApp:
         #reset mouse to original pos
         pyautogui.moveTo(x=current_x, y=current_y)
 
+    def play_practice_video(self):
+        # Handle video playback and listen for spacebar press
+        video_path = self.practice_video
+        self.current_video = os.path.basename(video_path)  # Store the current video file name
+
+        # Create a VLC instance and Media Player
+        Instance = vlc.Instance()
+        self.media_player = Instance.media_player_new()
+
+        # Set the media to the media player
+        Media = Instance.media_new(video_path)
+        self.media_player.set_media(Media)
+
+        # Set the media player's output to the canvas window
+        self.media_player.set_fullscreen(True)
+        self.media_player.set_xwindow(self.canvas.winfo_id())
+
+        # Play the video
+        self.media_player.play()
+        time.sleep(0.1)  # Give the player some time to start
+
+        # Start the timer
+        self.start_time = time.time()
 
     def play_video(self):
         # Handle video playback and listen for spacebar press
@@ -153,18 +205,6 @@ class ExperimentApp:
         # Start the timer
         self.start_time = time.time()
 
-    def on_vlc_keypress(self, event):
-        # Check if the pressed key is the spacebar
-        if event.u.key == vlc.libvlc_key_code_t.space.value:
-            # Calculate the reaction time
-            reaction_time = time.time() - self.start_time 
-
-            # Pause the video
-            self.media_player.stop()
-
-            # Show the decision screen
-            self.response_page(reaction_time)
-
     def on_spacebar(self, event):
         # Calculate the reaction time
         reaction_time = time.time() - self.start_time
@@ -185,19 +225,37 @@ class ExperimentApp:
         # Set the window background to white
         self.window.configure(bg="white")
 
-        # Create and place the buttons
-        green_button = tk.Button(self.window, text="Green", bg="green", command=lambda: self.record_response('Green', reaction_time))
-        red_button = tk.Button(self.window, text="Red", bg="red", command=lambda: self.record_response('Red', reaction_time))
+        # Create and place the button labels
+        if self.practice_mode:
+            button_label = Label(self.window, text="This is where you would select which block you think the robot\nwas moving towards\n\n When you are ready to begin the experiment, \nselect any of the following options", bg="white", font=("Helvetica", 12))    
+        else:
+            button_label = Label(self.window, text="Select the block you think the robot was moving towards", bg="white", font=("Helvetica", 16))
+        button_label.grid(row=0, column=0, columnspan=3, pady=20)
 
-        green_button.grid(row=0, column=0, padx=20, pady=20)
-        red_button.grid(row=0, column=1, padx=20, pady=20)
+        # Create and place the buttons
+        button_width = 20
+        button_height = 10
+        red_button = tk.Button(self.window, text="Red", bg="red", width=button_width, height=button_height, command=lambda: self.record_response('Red', reaction_time))
+        gray_button = tk.Button(self.window, text="Not Sure", bg="gray", width=button_width, height=button_height, command=lambda: self.record_response('Not Sure', reaction_time))
+        green_button = tk.Button(self.window, text="Green", bg="green", width=button_width, height=button_height, command=lambda: self.record_response('Green', reaction_time))
+        
+
+        red_button.grid(row=1, column=0, padx=20, pady=20)
+        gray_button.grid(row=1, column=1, padx=20, pady=20)
+        green_button.grid(row=1, column=2, padx=20, pady=20)
+        
 
     def record_response(self, response, reaction_time):
+        if self.practice_mode:
+            self.practice_mode = False
+            self.experiment_page()
+            return
+        
         # Record the reaction time and response
         self.results.append((self.current_video, reaction_time, response))
 
         # Check if the experiment is complete
-        if len(self.results) >= 3:
+        if len(self.results) >= 6:
             video_names, spacebar_times, button_responses = zip(*self.results)
             self.save_results(self.name.get(), self.gender.get(), self.age.get(), video_names, spacebar_times, button_responses)
             self.thank_you_screen()
@@ -268,14 +326,20 @@ class ExperimentApp:
 
         # Create the thank you message, restart button, and exit button
         thank_you_label = Label(self.window, text="Thank you for participating in our study!", bg="white", font=("Helvetica", 20))
-        restart_button = Button(self.window, text="Restart", command=self.main_page, bg="white", font=("Helvetica", 16))
-        exit_button = Button(self.window, text="Exit", command=sys.exit(), bg="white", font=("Helvetica", 16))
+        restart_button = Button(self.window, text="Restart", command=self.restart, bg="white", font=("Helvetica", 16))
+        exit_button = Button(self.window, text="Exit", command=self.close, bg="white", font=("Helvetica", 16))
 
         # Place the message and buttons on the window
         thank_you_label.pack(pady=50)
         restart_button.pack(pady=10)
         exit_button.pack(pady=10)
 
+    def restart(self):
+        self.window.destroy()
+        ExperimentApp()
+
+    def close(self):
+        self.window.destroy()
 
 if __name__ == "__main__":
     app = ExperimentApp()
