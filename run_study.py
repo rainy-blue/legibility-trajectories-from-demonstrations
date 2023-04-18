@@ -13,7 +13,7 @@ class ExperimentApp:
         # Initialize variables and setup GUI
         self.window = Tk()
         self.window.title("Legibility Study")
-        self.window.geometry("800x600")
+        self.window.geometry("1500x1000")
         self.window.configure(bg="white")
         
         self.name = StringVar()
@@ -132,7 +132,7 @@ class ExperimentApp:
         self.overlay.attributes("-fullscreen", True)
         self.overlay.attributes("-alpha", 0.0)  # Set window transparency to 0 (completely transparent)
         self.overlay.attributes("-topmost", True)
-        self.overlay.bind("<KeyPress-space>", self.on_spacebar)
+        self.overlay.bind("<KeyPress>", self.on_spacebar)
         self.overlay.focus_force()
         self.overlay.lift()  # Bring the overlay window to the top level
 
@@ -174,6 +174,15 @@ class ExperimentApp:
         # Start the timer
         self.start_time = time.time()
 
+        # Find the current position of the mouse
+        current_x, current_y = pyautogui.position()
+
+        # Force click transparent overlay to bring into focus
+        pyautogui.click(x=current_x, y=current_y)
+
+        #reset mouse to original pos
+        pyautogui.moveTo(x=current_x, y=current_y)
+
     def play_video(self):
         # Handle video playback and listen for spacebar press
         # Choose a random video from the folder
@@ -197,6 +206,15 @@ class ExperimentApp:
         time.sleep(0.1)  # Give the player some time to start
 
         self.start_time = time.time()
+
+         # Find the current position of the mouse
+        current_x, current_y = pyautogui.position()
+
+        # Force click transparent overlay to bring into focus
+        pyautogui.click(x=current_x, y=current_y)
+
+        #reset mouse to original pos
+        pyautogui.moveTo(x=current_x, y=current_y)
 
     def on_spacebar(self, event):
         # Calculate the reaction time
@@ -272,6 +290,7 @@ class ExperimentApp:
 
         # Append the new results to the existing DataFrame
         combined_df = existing_df.append(df, ignore_index=True)
+        # combined_df = pd.concat([existing_df, pd.DataFrame([df])], ignore_index=True)
 
         # Save the combined DataFrame to the Excel file
         combined_df.to_excel(results_file, index=False, engine='openpyxl')
@@ -330,5 +349,6 @@ class ExperimentApp:
 
 if __name__ == "__main__":
     app = ExperimentApp()
+    main()
 
 
